@@ -35,11 +35,6 @@ module MysqlHealth
     def http_response(data)
        MysqlHealth.log.debug("http_response")
       response = EventMachine::DelegatedHttpResponse.new(self)
-      if data.instance_of?(OpenStruct)
-        puts data.table.inspect
-        puts data.inspect
-      end
-       
       if data.nil?
         response.status = '500 Server Error'
         response.content = "Empty call to http_response\n"
