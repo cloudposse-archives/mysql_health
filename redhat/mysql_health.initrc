@@ -1,0 +1,117 @@
+#!/bin/bash
+#
+# mysql_health - a service for monitoring MySQL and exposing its health through an HTTP interface.
+#
+# chkconfig: 345 99 99
+# description: mysql_health
+# processname: mysql_health
+
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+MYSQL_HEALTH_NICE="-n 19"
+MYSQL_HEALTH_BIN="/usr/bin/mysql_health"
+MYSQL_HEALTH_LOG="/var/log/mysql_health.log"
+MYSQL_HEALTH_PID_FILE="/var/run/mysql_health.pid"
+MYSQL_HEALTH_HOME="/tmp"
+MYSQL_HEALTH_ARGS=""
+
+[ -f /etc/sysconfig/mysql_health ] && . /etc/sysconfig/mysql_health
+
+[ -x /usr/bin/mysql_health ] || exit 0
+
+
+start_mysql_health()
+{
+  cd $MYSQL_HEALTH_HOME
+  echo -n $"Starting mysql_health"
+  nice $MYSQL_HEALTH_NICE $MYSQL_HEALTH_BIN --server:pid-file="$MYSQL_HEALTH_PID_FILE" --log:file "$MYSQL_HEALTH_LOG" --server:daemonize $MYSQL_HEALTH_ARGS
+  result=$?
+  if [ "$result" -eq 0 ]; then
+    sleep 0.5
+    status -p "$MYSQL_HEALTH_PID_FILE" >/dev/null
+    result=$?
+    if [ "$result" -eq 0 ]; then
+      success
+    else
+      failure
+    fi
+  else
+    failure
+  fi
+  echo
+  return $result
+}
+
+stop_mysql_health()
+{
+  echo -n $"Stopping mysql_health"
+
+  if [ -f "$MYSQL_HEALTH_PID_FILE" ]; then
+    kill $(cat "$MYSQL_HEALTH_PID_FILE") 2>/dev/null
+    result=$?
+  else
+    result=1
+  fi
+
+  if [ "$result" -eq 0 ]; then
+    result=1
+    for i in {1..60}; do
+      if [ -f "$MYSQL_HEALTH_PID_FILE" ]; then
+        echo -n "."
+        sleep 1
+      else
+        result=0
+        break
+      fi
+    done
+  fi
+
+  if [ "$result" -eq 0 ];then
+    success
+  else
+    failure
+  fi
+  echo
+  return $result
+}
+
+
+status_mysql_health() {
+  echo -n "mysql_health"
+  if [ -f "$MYSQL_HEALTH_PID_FILE" ]; then
+    status -p "$MYSQL_HEALTH_PID_FILE"
+  else
+    echo " is not running"
+  fi
+}
+
+status=0
+# See how we were called.
+case "$1" in
+  start)
+  start_mysql_health
+  status=$?
+        ;;
+  stop)
+  stop_mysql_health
+  status=$?
+        ;;
+  restart|reload)
+  stop_mysql_health
+  sleep 1
+  start_mysql_health
+  status=$?
+  ;;
+  status)
+  status_mysql_health
+  status=$?
+  ;;
+  *)
+  echo $"Usage: $0 {start|stop|restart|reload}"
+  status=1
+esac
+
+exit $status
+exit 0
