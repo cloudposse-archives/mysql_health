@@ -147,12 +147,6 @@ module MysqlHealth
         @log = Logger.new(@options[:log][:file], @options[:log][:age], @options[:log][:size])
         @log.level = @options[:log][:level]
 
-        daemonize if @options[:server][:daemonize]
-        write_pid_file if @options[:server][:pid_file]
-
-        MysqlHealth.log = @log
-        MysqlHealth.health = Health.new(@options[:check])
-
       rescue ArgumentException => e
         puts e.message
         puts @optparse
@@ -182,16 +176,30 @@ module MysqlHealth
       end
     end
 
+    def remove_pid_file
+      File.unlink(@options[:server][:pid_file]) if @options[:server][:pid_file] && File.exists?(@options[:server][:pid_file])
+    end
+
     def execute
       begin
+        daemonize if @options[:server][:daemonize]
+        write_pid_file if @options[:server][:pid_file]
+
+        MysqlHealth.log = @log
+        MysqlHealth.health = Health.new(@options[:check])
+
         ::EM.run do
           ::EM.start_server @options[:server][:listen], @options[:server][:port], Server
         end
+        remove_pid_file()
       rescue ArgumentException => e
+        remove_pid_file()
         @log.fatal(e.message)
       rescue Interrupt => e
+        remove_pid_file()
         @log.info("exiting...")
       rescue Exception => e
+        remove_pid_file()
         @log.fatal(e.message + e.backtrace.join("\n"))
       end
     end
