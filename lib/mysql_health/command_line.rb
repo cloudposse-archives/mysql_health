@@ -66,17 +66,17 @@ module MysqlHealth
           end
 
           @options[:check][:allow_overlapping] = false
-          opts.on( '--check:allow-overlapping', 'Allow overlapping health checks') do
+          opts.on( '--check:allow-overlapping', "Allow overlapping health checks (default: #{@options[:check][:allow_overlapping]})") do
             @options[:check][:allow_overlapping] = true
           end
 
           @options[:check][:interval] = '10s'
-          opts.on( '--check:interval INTERVAL', 'Check health every INTERVAL') do |interval|
+          opts.on( '--check:interval INTERVAL', "Check health every INTERVAL (default: #{@options[:check][:interval]})") do |interval|
             @options[:check][:interval] = interval.to_s
           end
 
           @options[:check][:delay] = '0s'
-          opts.on( '--check:delay DELAY', 'Delay health checks for INTERVAL') do |delay|
+          opts.on( '--check:delay DELAY', "Delay health checks for INTERVAL (default: #{@options[:check][:delay]})") do |delay|
             @options[:check][:delay] = interval.to_s
           end
 
@@ -97,17 +97,17 @@ module MysqlHealth
 
           # Server
           @options[:server][:listen] = '0.0.0.0'
-          opts.on( '-l', '--server:listen ADDR', 'Server listen address') do |addr|
+          opts.on( '-l', '--server:listen ADDR', "Server listen address (default: #{@options[:server][:listen]})") do |addr|
             @options[:server][:addr] = host.to_s
           end
 
           @options[:server][:port] = 3305
-          opts.on( '-p', '--server:port PORT', 'Server listen port') do |port|
+          opts.on( '-p', '--server:port PORT', "Server listen port (default: #{@options[:server][:port]})") do |port|
             @options[:server][:port] = port.to_i
           end
 
           @options[:server][:daemonize] = false
-          opts.on( '-d', '--server:daemonize', 'Daemonize the process') do
+          opts.on( '-d', '--server:daemonize', "Daemonize the process (default: #{@options[:server][:daemonize]})") do
             @options[:server][:daemonize] = true
           end
 
@@ -122,7 +122,7 @@ module MysqlHealth
           #
 
           @options[:log][:level] = Logger::INFO
-          opts.on( '--log:level LEVEL', 'Logging level' ) do|level|
+          opts.on( '--log:level LEVEL', 'Logging level (default: INFO)' ) do|level|
             @options[:log][:level] = Logger.const_get level.upcase
           end
 
@@ -137,7 +137,7 @@ module MysqlHealth
           end
 
           @options[:log][:size] = 1024*1024*10
-          opts.on( '--log:size SIZE', 'Rotate logs after the grow past SIZE bytes' ) do |size|
+          opts.on( '--log:size SIZE', "Rotate logs after the grow past SIZE bytes (default: #{@options[:log][:size]})" ) do |size|
             @options[:log][:size] = size.to_i
           end
         end
