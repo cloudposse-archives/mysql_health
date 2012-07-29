@@ -6,7 +6,7 @@ Gem::Specification.new do |gem|
   gem.email         = ["e@osterman.com"]
   gem.summary       = %q{A service for monitoring MySQL and exposing its health through an HTTP interface.}
   gem.description   = %q{A service for monitoring MySQL and exposing its health through an HTTP interface for use with TCP load balancers (like haproxy) that support out-of-band health checks using HTTP.}
-  gem.homepage      = ""
+  gem.homepage      = "https://github.com/osterman/mysql_health"
   gem.files         = `git ls-files`.split($\)
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
