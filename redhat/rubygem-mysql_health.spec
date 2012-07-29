@@ -1,7 +1,7 @@
 %define ruby_sitelib %(ruby -rrbconfig -e "puts Config::CONFIG['sitelibdir']")
 %define gemdir %(ruby -rubygems -e 'puts Gem::dir' 2>/dev/null)
 %define gemname mysql_health
-%define gemversion 0.5.2
+%define gemversion 0.5.3
 %define geminstdir %{gemdir}/gems/%{gemname}-%{gemversion}
 %define gemfile %{gemname}-%{gemversion}.gem
 %define gemsummary %(ruby -rrubygems -e 'puts YAML.load(`gem specification %{gemfile}`).summary')

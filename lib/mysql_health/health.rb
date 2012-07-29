@@ -145,9 +145,13 @@ module MysqlHealth
 
       show_slave_status = []
       status = {}
-      dbh.select_all('SHOW SLAVE STATUS') do |row|
-        status[row[0].downcase.to_sym] = row[1]
-        show_slave_status << "#{row[0]}: #{row[1]}"
+      dbh.execute('SHOW SLAVE STATUS') do |sth|
+        sth.fetch_hash() do |row|
+          row.each_pair do |k,v|
+            status[k.downcase.to_sym] = v
+            show_slave_status << "#{k}: #{v}"
+          end
+        end
       end
 
       if status.length > 0
