@@ -17,7 +17,7 @@ Gem::Specification.new do |gem|
   gem.add_runtime_dependency('rufus-scheduler',  '>= 2.0.17')
   gem.add_runtime_dependency('eventmachine', '>= 1.0.0.beta.4')
   gem.add_runtime_dependency('eventmachine_httpserver', '>= 0.2.1')
-  gem.add_runtime_dependency('json', '>= 1.5.3')
+  gem.add_runtime_dependency('json', '>= 1.4.2')
   gem.add_runtime_dependency('dbi', '>= 0.4.5')
   gem.add_runtime_dependency('mysql', '>= 2.8.1')
 end
