@@ -18,5 +18,5 @@
 # along with mysql_health.  If not, see <http://www.gnu.org/licenses/>.
 #
 module MysqlHealth
-  VERSION = "0.5.6"
+  VERSION = "0.5.7"
 end
