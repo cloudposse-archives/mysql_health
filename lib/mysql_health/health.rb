@@ -106,78 +106,86 @@ module MysqlHealth
 
     def check_master
       MysqlHealth.log.debug("check_master")
-
-      # connect to the MySQL server
-      dbh = DBI.connect(@options[:dsn], @options[:username], @options[:password])
-
       response = {}
       response[:content_type] = 'text/plain'
 
-      status = {}
-      dbh.select_all('SHOW STATUS') do |row|
-        status[row[0].downcase.to_sym] = row[1]
-      end
-      mysqladmin_status = "Uptime: %s  Threads: %s  Questions: %s  Slow queries: %s  Opens: %s  Flush tables: %s  Open tables: %s  Queries per second avg: %.3f\n" %
-                [ status[:uptime], status[:threads_running], status[:questions], status[:slow_queries], status[:opened_tables], status[:flush_commands], status[:open_tables], status[:queries].to_i/status[:uptime].to_i]
-      if status.length > 0
-        if read_only?(dbh)
-          response[:status] = '503 Service Read Only'
-          response[:content] = mysqladmin_status
+      begin
+        # connect to the MySQL server
+        dbh = DBI.connect(@options[:dsn], @options[:username], @options[:password])
+
+        status = {}
+        dbh.select_all('SHOW STATUS') do |row|
+          status[row[0].downcase.to_sym] = row[1]
+        end
+        mysqladmin_status = "Uptime: %s  Threads: %s  Questions: %s  Slow queries: %s  Opens: %s  Flush tables: %s  Open tables: %s  Queries per second avg: %.3f\n" %
+                  [ status[:uptime], status[:threads_running], status[:questions], status[:slow_queries], status[:opened_tables], status[:flush_commands], status[:open_tables], status[:queries].to_i/status[:uptime].to_i]
+        if status.length > 0
+          if read_only?(dbh)
+            response[:status] = '503 Service Read Only'
+            response[:content] = mysqladmin_status
+          else
+            response[:status] = '200 OK'
+            response[:content] = mysqladmin_status
+          end
         else
-          response[:status] = '200 OK'
+          response[:status] = '503 Service Unavailable'
           response[:content] = mysqladmin_status
         end
-      else
-        response[:status] = '503 Service Unavailable'
-        response[:content] = mysqladmin_status
+      rescue Exception => e
+        response[:status] = '500 Server Error'
+        response[:content] = e.message
       end
       self.master_status=(response)
     end
 
     def check_slave
       MysqlHealth.log.debug("check_slave")
-
-      # connect to the MySQL server
-      dbh = DBI.connect(@options[:dsn], @options[:username], @options[:password])
-
       response = {}
       response[:content_type] = 'text/plain'
 
-      show_slave_status = []
-      status = {}
-      dbh.execute('SHOW SLAVE STATUS') do |sth|
-        sth.fetch_hash() do |row|
-          row.each_pair do |k,v|
-            status[k.downcase.to_sym] = v
-            show_slave_status << "#{k}: #{v}"
+      begin
+        # connect to the MySQL server
+        dbh = DBI.connect(@options[:dsn], @options[:username], @options[:password])
+
+        show_slave_status = []
+        status = {}
+        dbh.execute('SHOW SLAVE STATUS') do |sth|
+          sth.fetch_hash() do |row|
+            row.each_pair do |k,v|
+              status[k.downcase.to_sym] = v
+              show_slave_status << "#{k}: #{v}"
+            end
           end
         end
-      end
 
-      if status.length > 0
-        seconds_behind_master = status[:seconds_behind_master]
+        if status.length > 0
+          seconds_behind_master = status[:seconds_behind_master]
 
-        # We return a "203 Non-Authoritative Information" when replication is shot. We don't want to reduce site performance, but still want to track that something is awry.
-        if seconds_behind_master.eql?('NULL')
-          response[:status] = '203 Slave Stopped'
-          response[:content] = status.to_json
-          response[:content_type] = 'application/json'
-        elsif seconds_behind_master.to_i > 60*30
-          response[:status] = '203 Slave Behind'
-          response[:content] = status.to_json
-          response[:content_type] = 'application/json'
-        elsif read_only?(dbh)
-          response[:status] = '200 OK ' + seconds_behind_master  + ' Seconds Behind Master'
-          response[:content] = status.to_json
-          response[:content_type] = 'application/json'
+          # We return a "203 Non-Authoritative Information" when replication is shot. We don't want to reduce site performance, but still want to track that something is awry.
+          if seconds_behind_master.eql?('NULL')
+            response[:status] = '203 Slave Stopped'
+            response[:content] = status.to_json
+            response[:content_type] = 'application/json'
+          elsif seconds_behind_master.to_i > 60*30
+            response[:status] = '203 Slave Behind'
+            response[:content] = status.to_json
+            response[:content_type] = 'application/json'
+          elsif read_only?(dbh)
+            response[:status] = '200 OK ' + seconds_behind_master  + ' Seconds Behind Master'
+            response[:content] = status.to_json
+            response[:content_type] = 'application/json'
+          else
+            response[:status] = '503 Service Unavailable'
+            response[:content] = status.to_json
+            response[:content_type] = 'application/json'
+          end
         else
-          response[:status] = '503 Service Unavailable'
-          response[:content] = status.to_json
-          response[:content_type] = 'application/json'
+          response[:status] = '503 Slave Not Configured'
+          response[:content] = show_slave_status.join("\n")
         end
-      else
-        response[:status] = '503 Slave Not Configured'
-        response[:content] = show_slave_status.join("\n")
+      rescue Exception => e
+        response[:status] = '500 Server Error'
+        response[:content] = e.message
       end
       self.slave_status=(response)
     end
