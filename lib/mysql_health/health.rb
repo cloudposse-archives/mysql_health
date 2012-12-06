@@ -71,7 +71,7 @@ module MysqlHealth
 
     def master_status=(response)
       @mutex.synchronize do
-        MysqlHealth.log.info("master status: #{response[:status]}")
+        MysqlHealth.log.info("master status: #{response[:status]} (#{response[:content].split(/\n/)[0]})")
         @master_status = response
       end
     end
@@ -86,7 +86,7 @@ module MysqlHealth
 
     def slave_status=(response)
       @mutex.synchronize do 
-        MysqlHealth.log.info("slave status: #{response[:status]}")
+        MysqlHealth.log.info("slave status: #{response[:status]} (#{response[:content].split(/\n/)[0]})")
         @slave_status = response
       end
     end
@@ -104,6 +104,10 @@ module MysqlHealth
       return (variables.length == 1)
     end
 
+    def master?(dbh)
+      read_only?(dbh) == false
+    end
+
     def check_master
       MysqlHealth.log.debug("check_master")
       response = {}
@@ -113,29 +117,71 @@ module MysqlHealth
         # connect to the MySQL server
         dbh = DBI.connect(@options[:dsn], @options[:username], @options[:password])
 
-        status = {}
-        dbh.select_all('SHOW STATUS') do |row|
-          status[row[0].downcase.to_sym] = row[1]
+        # Validate that database exists
+        unless @options[:database].nil?
+          unless database?(dbh, @options[:database])
+            raise Exception.new("Database schema named #{@options[:database]} does not exist")
+          end
         end
-        mysqladmin_status = "Uptime: %s  Threads: %s  Questions: %s  Slow queries: %s  Opens: %s  Flush tables: %s  Open tables: %s  Queries per second avg: %.3f\n" %
-                  [ status[:uptime], status[:threads_running], status[:questions], status[:slow_queries], status[:opened_tables], status[:flush_commands], status[:open_tables], status[:queries].to_i/status[:uptime].to_i]
+
+        status = show_status(dbh)
         if status.length > 0
           if read_only?(dbh)
             response[:status] = '503 Service Read Only'
-            response[:content] = mysqladmin_status
+            response[:content] = describe_status(status)
           else
             response[:status] = '200 OK'
-            response[:content] = mysqladmin_status
+            response[:content] = describe_status(status)
           end
         else
           response[:status] = '503 Service Unavailable'
-          response[:content] = mysqladmin_status
+          response[:content] = describe_status(status)
         end
       rescue Exception => e
         response[:status] = '500 Server Error'
         response[:content] = e.message
       end
       self.master_status=(response)
+    end
+
+    def describe_status(status)
+      # Mimick "mysqladmin status"
+      "Uptime: %s  Threads: %s  Questions: %s  Slow queries: %s  Opens: %s  Flush tables: %s  Open tables: %s  Queries per second avg: %.3f\n" %
+                [ status[:uptime], status[:threads_running], status[:questions], status[:slow_queries], status[:opened_tables], status[:flush_commands], status[:open_tables], status[:queries].to_i/status[:uptime].to_i]
+    end
+
+    # Return a hash of status information
+    def show_status(dbh, type = nil)
+      status = {}
+      if type.nil?
+        # Format of "SHOW STATUS" differs from "SHOW [MASTER|SLAVE] STATUS"
+        dbh.select_all('SHOW STATUS') do |row|
+          status[row[0].downcase.to_sym] = row[1]
+        end
+      else
+        dbh.execute('SHOW %s STATUS' % type.to_s.upcase) do |sth|
+          sth.fetch_hash() do |row|
+            row.each_pair do |k,v|
+              status[k.downcase.to_sym] = v
+            end
+          end
+        end
+      end
+      status
+    end
+
+    def show_create_database(dbh, name)
+      schema = nil
+      dbh.execute('SHOW CREATE DATABASE %s' % name) do |sth|
+        sth.fetch() do |row|
+          schema = row[1]
+        end
+      end
+      return schema
+    end
+
+    def database?(dbh, name)
+      show_create_database(dbh, name).nil? == false
     end
 
     def check_slave
@@ -147,41 +193,42 @@ module MysqlHealth
         # connect to the MySQL server
         dbh = DBI.connect(@options[:dsn], @options[:username], @options[:password])
 
-        show_slave_status = []
-        status = {}
-        dbh.execute('SHOW SLAVE STATUS') do |sth|
-          sth.fetch_hash() do |row|
-            row.each_pair do |k,v|
-              status[k.downcase.to_sym] = v
-              show_slave_status << "#{k}: #{v}"
-            end
+        # Validate that database exists
+        unless @options[:database].nil?
+          unless database?(dbh, @options[:database])
+            raise Exception.new("Database schema named #{@options[:database]} does not exist")
           end
         end
 
-        if status.length > 0
-          seconds_behind_master = status[:seconds_behind_master]
+        show_slave_status = show_status(dbh, :slave)
+        if show_slave_status.length > 0
+          seconds_behind_master = show_slave_status[:seconds_behind_master]
 
           # We return a "203 Non-Authoritative Information" when replication is shot. We don't want to reduce site performance, but still want to track that something is awry.
           if seconds_behind_master.eql?('NULL')
             response[:status] = '203 Slave Stopped'
-            response[:content] = status.to_json
+            response[:content] = show_slave_status.to_json
             response[:content_type] = 'application/json'
           elsif seconds_behind_master.to_i > 60*30
             response[:status] = '203 Slave Behind'
-            response[:content] = status.to_json
+            response[:content] = show_slave_status.to_json
             response[:content_type] = 'application/json'
           elsif read_only?(dbh)
             response[:status] = '200 OK ' + seconds_behind_master  + ' Seconds Behind Master'
-            response[:content] = status.to_json
+            response[:content] = show_slave_status.to_json
             response[:content_type] = 'application/json'
           else
             response[:status] = '503 Service Unavailable'
-            response[:content] = status.to_json
+            response[:content] = show_slave_status.to_json
             response[:content_type] = 'application/json'
           end
+        elsif @options[:allow_master] && master?(dbh)
+            response[:status] = '200 OK Master Running'
+            response[:content] = describe_status show_status(dbh)
+            response[:content_type] = 'application/json'
         else
           response[:status] = '503 Slave Not Configured'
-          response[:content] = show_slave_status.join("\n")
+          response[:content] = show_slave_status.to_json
         end
       rescue Exception => e
         response[:status] = '500 Server Error'

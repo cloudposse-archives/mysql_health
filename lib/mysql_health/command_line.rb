@@ -65,9 +65,19 @@ module MysqlHealth
             @options[:check][:slave] = true
           end
 
+          @options[:check][:database] = nil
+          opts.on( '--check:database NAME', 'Ensure that database exists') do |name|
+            @options[:check][:database] = name
+          end
+
           @options[:check][:allow_overlapping] = false
           opts.on( '--check:allow-overlapping', "Allow overlapping health checks (default: #{@options[:check][:allow_overlapping]})") do
             @options[:check][:allow_overlapping] = true
+          end
+
+          @options[:check][:allow_master] = false
+          opts.on( '--check:allow-master', "Allow master to act as slave when --check:slave is used (default: #{@options[:check][:allow_master]})") do
+            @options[:check][:allow_master] = true
           end
 
           @options[:check][:interval] = '10s'
@@ -77,7 +87,7 @@ module MysqlHealth
 
           @options[:check][:delay] = '0s'
           opts.on( '--check:delay DELAY', "Delay health checks for INTERVAL (default: #{@options[:check][:delay]})") do |delay|
-            @options[:check][:delay] = interval.to_s
+            @options[:check][:delay] = delay.to_s
           end
 
           @options[:check][:dsn] ||= "DBI:Mysql:mysql:localhost"
@@ -92,13 +102,13 @@ module MysqlHealth
 
           @options[:check][:password] ||= ""
           opts.on( '--check:password PASSWORD', "MySQL Password (default: #{@options[:check][:password]})") do |password|
-            @options[:check][:password] = interval.to_s
+            @options[:check][:password] = password.to_s
           end
 
           # Server
           @options[:server][:listen] = '0.0.0.0'
           opts.on( '-l', '--server:listen ADDR', "Server listen address (default: #{@options[:server][:listen]})") do |addr|
-            @options[:server][:addr] = host.to_s
+            @options[:server][:addr] = addr.to_s
           end
 
           @options[:server][:port] = 3305
