@@ -2,7 +2,7 @@
 
 MySQL Health is a standalone HTTP server that will respond with a 200 status code when MySQL is operating as expected. 
 
-This script is intended to be used in conjuction with HAProxy "option httpchk" for a TCP load balancer distributing load across mysql servers.
+This script is intended to be used in conjunction with HAProxy "option httpchk" for a TCP load balancer distributing load across mysql servers.
 
 ## FAQs
 
